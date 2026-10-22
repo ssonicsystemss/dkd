@@ -80,9 +80,9 @@ namespace ds
         p.closeSubPath();
         g.setGradientFill (ColourGradient (Colours::white.withAlpha (0.05f), 0.0f, 0.0f, Colours::transparentWhite, (float) w * 0.35f, (float) h * 0.22f, false));
         g.fillPath (p);
-        g.setGradientFill (ColourGradient (Colours::transparentBlack, (float) w * 0.5f, (float) h * 0.5f, Colours::black.withAlpha (0.32f), 0.0f, 0.0f, true));
+        g.setGradientFill (ColourGradient (Colours::transparentBlack, (float) w * 0.5f, (float) h * 0.5f, Colours::black.withAlpha (0.18f), 0.0f, 0.0f, true));
         g.fillRect (0, 0, w, h);
-        g.setColour (Colours::black.withAlpha (0.2f));
+        g.setColour (Colours::black.withAlpha (0.1f));
         for (int y = 1; y < h; y += 3) g.fillRect (0, y, w, 1);
         return img;
     }
@@ -103,21 +103,21 @@ void DsButton::paint (Graphics& g)
             g.drawRoundedRectangle (r, 6.0f, 1.0f);
             const bool active = playIcon ? down : on;
             g.setColour (active ? ds::ledAmber : ds::ledAmber.withAlpha (0.2f));
-            g.fillEllipse (r.getRight() - 9.0f, r.getY() + 6.0f, 4.0f, 4.0f);
+            g.fillEllipse (r.getRight() - 12.0f, r.getY() + 7.0f, 5.0f, 5.0f);
             g.setColour (txtCol (false));
-            g.setFont (Fiss::mono (7.5f, Fiss::Weight::regular));
-            g.drawText (face, Rectangle<float> (r.getX() + 5.0f, r.getY() + 3.0f, r.getWidth() - 14.0f, 10.0f), Justification::centredLeft, false);
+            g.setFont (Fiss::mono (10.0f, Fiss::Weight::semibold));
+            g.drawText (face, Rectangle<float> (r.getX() + 7.0f, r.getY() + 4.0f, r.getWidth() - 20.0f, 14.0f), Justification::centredLeft, false);
             if (playIcon)
             {
-                Path tri; tri.addTriangle (-5.0f, -7.0f, -5.0f, 7.0f, 7.0f, 0.0f);
+                Path tri; tri.addTriangle (-7.0f, -10.0f, -7.0f, 10.0f, 10.0f, 0.0f);
                 g.setColour (txtCol (down));
-                g.fillPath (tri, AffineTransform::translation (r.getCentreX(), r.getBottom() - 14.0f));
+                g.fillPath (tri, AffineTransform::translation (r.getCentreX(), r.getBottom() - 19.0f));
             }
             else if (caption)
             {
                 g.setColour (txtCol (on));
-                g.setFont (Fiss::mono (11.0f, Fiss::Weight::semibold));
-                g.drawText (caption(), Rectangle<float> (r.getX(), r.getBottom() - 24.0f, r.getWidth(), 16.0f), Justification::centred, false);
+                g.setFont (Fiss::mono (16.0f, Fiss::Weight::semibold));
+                g.drawText (caption(), Rectangle<float> (r.getX(), r.getBottom() - 32.0f, r.getWidth(), 22.0f), Justification::centred, false);
             }
             break;
         }
@@ -128,7 +128,7 @@ void DsButton::paint (Graphics& g)
             g.setColour (over ? ds::steelMid : ds::keyRim);
             g.drawRoundedRectangle (r, r.getHeight() * 0.5f, 1.0f);
             g.setColour (txtCol (false));
-            g.setFont (Fiss::mono (8.5f, Fiss::Weight::regular));
+            g.setFont (Fiss::mono (11.0f, Fiss::Weight::semibold));
             g.drawText (face, r, Justification::centred, false);
             break;
         }
@@ -176,11 +176,11 @@ void DsWheel::paint (Graphics& g)
     if (q != nullptr)   // what it edits
     {
         g.setColour (ds::print);
-        g.setFont (Fiss::mono (8.5f, Fiss::Weight::regular));
-        g.drawText (Digi::fit (q->getName (32).toUpperCase(), 18), Rectangle<float> (0.0f, 108.0f, (float) getWidth(), 12.0f), Justification::centred, false);
+        g.setFont (Fiss::mono (11.0f, Fiss::Weight::semibold));
+        g.drawText (Digi::fit (q->getName (32).toUpperCase(), 16), Rectangle<float> (0.0f, 106.0f, (float) getWidth(), 15.0f), Justification::centred, false);
         g.setColour (ds::ledAmber);
-        g.setFont (Fiss::mono (10.0f, Fiss::Weight::semibold));
-        g.drawText (Digi::fit (Digi::shortValue (q->getCurrentValueAsText()), 14), Rectangle<float> (0.0f, 122.0f, (float) getWidth(), 14.0f), Justification::centred, false);
+        g.setFont (Fiss::mono (14.0f, Fiss::Weight::semibold));
+        g.drawText (Digi::fit (Digi::shortValue (q->getCurrentValueAsText()), 12), Rectangle<float> (0.0f, 123.0f, (float) getWidth(), 18.0f), Justification::centred, false);
     }
 }
 
@@ -362,7 +362,7 @@ void DsBody::paint (Graphics& g)
     ds::ledDot (g, { W * 0.5f - 30.0f, hy }, ds::ledGreen, true);
     ds::ledDot (g, { W * 0.5f + 30.0f, hy }, ds::ledAmber, false);
     g.setColour (Colours::black.withAlpha (0.6f));
-    g.setFont (Fiss::mono (7.0f, Fiss::Weight::regular));
+    g.setFont (Fiss::mono (9.0f, Fiss::Weight::regular));
     g.drawText ("POWER", Rectangle<float> (W * 0.5f - 86.0f, hy - 5.0f, 48.0f, 10.0f), Justification::centredRight, false);
     g.drawText ("CHARGE", Rectangle<float> (W * 0.5f + 38.0f, hy - 5.0f, 50.0f, 10.0f), Justification::centredLeft, false);
 
@@ -375,7 +375,7 @@ void DsBody::paint (Graphics& g)
     g.setFont (Fiss::mono (26.0f, Fiss::Weight::semibold));
     g.drawText (Branding::displayName, Rectangle<float> (lcd.getX(), 10.0f, 200.0f, 34.0f), Justification::centredLeft, false);
     g.setColour (ds::print);
-    g.setFont (Fiss::mono (13.0f, Fiss::Weight::regular));
+    g.setFont (Fiss::mono (15.0f, Fiss::Weight::regular));
     g.drawText (Branding::companyName, Rectangle<float> (lcd.getRight() - 240.0f, 10.0f, 240.0f, 34.0f), Justification::centredRight, false);
 
     // microphone
@@ -412,15 +412,15 @@ void DsBody::resized()
     // hardware, either side of the touch screen (all >= 36 px hit targets at 100 %)
     const int lx = 90, rx = W - 90, cy = 699;
     wheel.setBounds (lx - 55, cy - 55, 110, 140);
-    const int pad = 44, off = 25;
+    const int pad = 62, off = 35;
     padTest   ->setBounds (rx - off - pad / 2, cy - off - pad / 2, pad, pad);
     padPattern->setBounds (rx + off - pad / 2, cy - off - pad / 2, pad, pad);
     padKick   ->setBounds (rx - off - pad / 2, cy + off - pad / 2, pad, pad);
     padBass   ->setBounds (rx + off - pad / 2, cy + off - pad / 2, pad, pad);
-    prevKey  ->setBounds (lx - 58, 806, 54, 22);
-    nextKey  ->setBounds (lx + 4, 806, 54, 22);
-    randomKey->setBounds (rx - 58, 806, 54, 22);
-    undoKey  ->setBounds (rx + 4, 806, 54, 22);
+    prevKey  ->setBounds (lx - 70, 796, 66, 30);
+    nextKey  ->setBounds (lx + 4, 796, 66, 30);
+    randomKey->setBounds (rx - 70, 796, 66, 30);
+    undoKey  ->setBounds (rx + 4, 796, 66, 30);
 }
 
 // ======================================================================= editor
@@ -480,9 +480,9 @@ DsLiteEditor::DsLiteEditor (RutherfordProcessor& p)
     double startScale = (double) proc.apvts.state.getProperty ("uiScale", 0.0);
     if (! (startScale > 0.0))
     {
-        startScale = 1.0;
+        startScale = 0.85;
         if (auto* d = Desktop::getInstance().getDisplays().getPrimaryDisplay())
-            startScale = jmin (1.0, (d->userArea.getHeight() - 90) / (double) DsBody::H, (d->userArea.getWidth() - 40) / (double) DsBody::W);
+            startScale = jmin (0.85, (d->userArea.getHeight() - 90) / (double) DsBody::H, (d->userArea.getWidth() - 40) / (double) DsBody::W);
     }
     startScale = jlimit (0.6, 1.5, startScale);
     setResizable (true, true);

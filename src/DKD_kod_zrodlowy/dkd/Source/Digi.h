@@ -13,8 +13,8 @@ namespace Col
 {
     const juce::Colour bg   { 0xff03100a };
     const juce::Colour grid { 0xff0a2415 };   // unlit segments
-    const juce::Colour dim  { 0xff14502e };
-    const juce::Colour mid  { 0xff29a85e };
+    const juce::Colour dim  { 0xff1f6e40 };
+    const juce::Colour mid  { 0xff4ccf80 };
     const juce::Colour hi   { 0xff8bffb4 };
     const juce::Colour warn { 0xffffb347 };
 }

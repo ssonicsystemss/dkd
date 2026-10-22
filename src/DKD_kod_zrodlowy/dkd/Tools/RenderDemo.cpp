@@ -259,6 +259,15 @@ int main (int argc, char** argv)
         PNGImageFormat png;
         if (! png.writeImageToStream (img, os)) { std::printf ("ERROR: png\n"); return 3; }
         std::printf ("GUI screenshot: %s (%dx%d)\n", pf.getFullPathName().toRawUTF8(), img.getWidth(), img.getHeight());
+        {   // and at 85 %, the size the plugin opens with
+            ed->setSize (roundToInt (img.getWidth() * 0.85), roundToInt (img.getHeight() * 0.85));
+            auto simg = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
+            File sp = File::getCurrentWorkingDirectory().getChildFile (pngPath.upToLastOccurrenceOf (".", false, false) + "-small.png");
+            sp.deleteFile();
+            FileOutputStream sos (sp);
+            png.writeImageToStream (simg, sos);
+            ed->setSize (img.getWidth(), img.getHeight());
+        }
         if (auto* de = dynamic_cast<DsLiteEditor*> (ed.get()))   // the other touch-screen pages: name-page2.png ...
             for (int pg = 1; pg < 5; ++pg)
             {

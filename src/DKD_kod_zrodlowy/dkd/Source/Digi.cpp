@@ -81,7 +81,7 @@ void text (Graphics& g, const String& s, int x, int y, int scale, Colour c)
         for (int row = 0; row < 7; ++row)
             for (int col = 0; col < 5; ++col)
                 if (r[row] & (0x10 >> col))
-                    rl.addWithoutMerging (Rectangle<float> (px + (float) col * sc, (float) y + (float) row * sc, sc, sc));
+                    rl.addWithoutMerging (Rectangle<float> (px + (float) col * sc, (float) y + (float) row * sc, sc + 0.35f, sc + 0.35f));
         px += (float) advance * sc;
     }
     g.setColour (c);
@@ -480,7 +480,7 @@ void PlotView::paint (Graphics& g)
     }
     for (int i = 0; i < 4; ++i)
         text (g, String (roundToInt ((double) i * 0.25 * beatMs)), (int) xAt ((float) i * 0.25f) + 3, 200, 2, Col::mid);
-    textRight (g, "MS", getWidth() - 4, 200, 2, Col::dim);
+    textRight (g, "MS", getWidth() - 4, 200, 2, Col::mid);
 
     // handles with their names
     const auto hs = handles();
@@ -507,15 +507,15 @@ void PlotView::paint (Graphics& g)
     // numbers
     const double gap = (1.0 - prm.bassEnd) / steps * beatMs;
     text (g, "TAIL " + String (roundToInt (prm.tail * beatMs)) + " MS  BASS " + String (roundToInt (prm.bassStart / steps * beatMs)) + "-"
-                 + String (roundToInt (prm.bassEnd / steps * beatMs)) + " MS", 6, 222, 2, Col::hi);
+                 + String (roundToInt (prm.bassEnd / steps * beatMs)) + " MS", 6, 218, 2, Col::hi);
     text (g, "GAP " + String (roundToInt (gap)) + " MS  RISE +" + String (prm.riseSt, 1) + " ST  BEAT " + String (roundToInt (beatMs)) + " MS", 6, 238, 2, Col::mid);
     if (overlap > 0.0f)
     {
         if (frozen || (Time::getMillisecondCounterHiRes() / 400.0 - std::floor (Time::getMillisecondCounterHiRes() / 400.0)) < 0.7)
-            text (g, "!! OVERLAP " + String (roundToInt (overlap * beatMs)) + " MS = MUD", 6, 254, 2, Col::warn);
+            text (g, "!! OVERLAP " + String (roundToInt (overlap * beatMs)) + " MS = MUD", 6, 258, 2, Col::warn);
     }
     else
-        text (g, "CLEAN: " + String (roundToInt (-overlap * beatMs)) + " MS BETWEEN TAIL AND BASS", 6, 254, 2, Col::mid);
+        text (g, "CLEAN: " + String (roundToInt (-overlap * beatMs)) + " MS BETWEEN TAIL AND BASS", 6, 258, 2, Col::mid);
     g.setColour (Col::dim);
     g.drawRect (getLocalBounds(), 1);
 }
@@ -535,7 +535,7 @@ void SliderRow::paint (Graphics& g)
     {
         const bool on = zn >= 0.0f ? (i >= jmin (lit, zi) && i < jmax (lit, zi)) : i < lit;
         g.setColour (on ? Col::hi : (zn >= 0.0f && i == zi ? Col::dim : Col::grid));
-        g.fillRect (barL + i * 8, ty, 7, 14);
+        g.fillRect (Rectangle<float> ((float) (barL + i * 8), (float) ty, 7.0f, 14.0f));
     }
     textRight (g, fit (shortValue (valueText()), 9), getWidth() - 4, ty, 2, Col::hi);
     if (session.isLocked (param.paramID)) { g.setColour (Col::warn); g.fillRect (getWidth() - 7, 2, 5, 5); }
