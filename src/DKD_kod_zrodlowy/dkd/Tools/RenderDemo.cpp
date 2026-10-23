@@ -135,9 +135,9 @@ int main (int argc, char** argv)
             if (body > 1.0e-4) ++bass;
             if (gap < body * 0.05) ++gaps;
         }
-        check (kicks == 14, "a kick on every beat (" + String (kicks) + "/14)");
-        check (bass == 14, "the reverse bass swells between the kicks (" + String (bass) + "/14)");
-        check (gaps == 14, "a quiet gap before every kick (" + String (gaps) + "/14)");
+        if (Variant::hasKick) check (kicks == 14, "a kick on every beat (" + String (kicks) + "/14)");
+        if (Variant::hasBass) check (bass == 14, "the reverse bass swells between the kicks (" + String (bass) + "/14)");
+        if (Variant::hasBass) check (gaps == 14, "a quiet gap before every kick (" + String (gaps) + "/14)");
 
         File f = File::getCurrentWorkingDirectory().getChildFile (wavPath);
         f.deleteFile();
@@ -146,6 +146,7 @@ int main (int argc, char** argv)
         if (w != nullptr) { w->writeFromAudioSampleBuffer (demo, 0, demo.getNumSamples()); std::printf ("WAV written: %s\n", f.getFullPathName().toRawUTF8()); }
     }
 
+#if DKD_VARIANT != 1
     // ---- 2. the bass pitch (a long, flat swell so the pitch can be counted): F -> 43.65 Hz, G -> 49.00 Hz
     for (auto [note, want] : { std::pair<int, double> { F3, 43.65 }, { G3, 49.0 } })
     {
@@ -157,12 +158,13 @@ int main (int argc, char** argv)
         check (std::abs (hz - want) < 2.0, "bass pitch of note " + String (note) + ": " + String (hz, 2) + " Hz (want " + String (want, 2) + ")");
     }
 
+#endif
     // ---- 3. MIDI Note mode: one kick + one beat of bass, then silence
     {
         RutherfordProcessor pp;
         setParam (pp, PID::trigger, 1.0f);
         const auto b = render (pp, 3 * beat, { { 0.0, MidiMessage::noteOn (1, F3, 0.9f) }, { 2 * beat, MidiMessage::noteOff (1, F3) } }, false);
-        check (peakIn (b, 0.0, 0.015) > 0.3f && energy (b, 0.6 * beat, 0.85 * beat) > 1.0e-4 && energy (b, 1.3 * beat, 1.9 * beat) < 1.0e-6,
+        check ((! Variant::hasKick || peakIn (b, 0.0, 0.015) > 0.3f) && (! Variant::hasBass || energy (b, 0.6 * beat, 0.85 * beat) > 1.0e-4) && energy (b, 1.3 * beat, 1.9 * beat) < 1.0e-6,
                "MIDI Note mode: one kick + one swell, then silence");
     }
 
@@ -171,7 +173,8 @@ int main (int argc, char** argv)
         RutherfordProcessor pp;
         const auto b = render (pp, 4.2 * beat, { { 0.05, MidiMessage::noteOn (1, F3, 0.9f) } }, false);
         int k = 0;
-        for (int i = 0; i < 4; ++i) if (peakIn (b, 0.05 + i * beat, 0.05 + i * beat + 0.015) > 0.3f) ++k;
+        for (int i = 0; i < 4; ++i)
+            if (Variant::hasKick ? peakIn (b, 0.05 + i * beat, 0.05 + i * beat + 0.015) > 0.3f : energy (b, 0.05 + (i + 0.6) * beat, 0.05 + (i + 0.85) * beat) > 1.0e-4) ++k;
         check (k == 4, "stopped transport: kicks every beat from the key press (" + String (k) + "/4)");
     }
 
@@ -238,7 +241,9 @@ int main (int argc, char** argv)
     }
 
     // ---- 9. GUI screenshot: F held, the beat 62 % through (the neutron on the inner circle)
+#if DKD_VARIANT != 2   // dkdomega has no kick for the own sample to sit on
     if (! Sonic::ownSoundSelfTest<RutherfordProcessor> (sr, block, 53, 2.0f)) { std::printf ("RESULT: FAIL\n"); return 1; }
+#endif
 
     if (pngPath.isNotEmpty())
     {
@@ -270,7 +275,7 @@ int main (int argc, char** argv)
             ed->setSize (img.getWidth(), img.getHeight());
         }
         if (auto* dv = dynamic_cast<DsLiteEditor*> (ed.get()))   // the other views of the top screen: name-view2.png ...
-            for (int v = 1; v < 4; ++v)
+            for (int v = 1; v < (Variant::gem ? 3 : 4); ++v)
             {
                 dv->showView (v);
                 auto vimg = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
@@ -280,7 +285,7 @@ int main (int argc, char** argv)
                 png.writeImageToStream (vimg, vos);
             }
         if (auto* de = dynamic_cast<DsLiteEditor*> (ed.get()))   // the other touch-screen pages: name-page2.png ...
-            for (int pg = 1; pg < 8; ++pg)
+            for (int pg = 1; pg < (Variant::gem ? 6 : 8); ++pg)
             {
                 de->showPage (pg);
                 auto pimg = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
@@ -292,6 +297,7 @@ int main (int argc, char** argv)
     }
 
     // ---- 9b. modulation: the sequencer, an LFO, a macro, the taps
+    if (Variant::hasBass)
     {
         RutherfordProcessor pp;
         setParam (pp, PID::seqOn, 1.0f); setParam (pp, PID::seqLevel[3], 0.0f);

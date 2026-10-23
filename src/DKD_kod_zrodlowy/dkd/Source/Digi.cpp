@@ -114,8 +114,8 @@ Rectangle<int> Header::zoneRect (Zone z) const
     const int w = getWidth(), nextX = w - 124 - 10 - 28;
     switch (z)
     {
-        case Zone::prev: return { 66, 2, 28, 26 };
-        case Zone::name: return { 94, 2, nextX - 94, 26 };
+        case Zone::prev: return { logoW() + 6, 2, 28, 26 };
+        case Zone::name: return { logoW() + 34, 2, nextX - logoW() - 34, 26 };
         case Zone::next: return { nextX, 2, 28, 26 };
         case Zone::mine: return { w - 124, 2, 56, 26 };
         case Zone::undo: return { w - 62, 2, 60, 26 };
@@ -134,8 +134,8 @@ Header::Zone Header::zoneAt (Point<float> p) const
 void Header::paint (Graphics& g)
 {
     g.setColour (Col::hi);
-    g.fillRect (0, 0, 60, 30);
-    textCentre (g, pluginName, { 0, 0, 60, 30 }, 2, Col::bg);
+    g.fillRect (0, 0, logoW(), 30);
+    textCentre (g, pluginName, { 0, 0, logoW(), 30 }, 2, Col::bg);
 
     auto box = [&] (Zone z, const String& s, bool enabled = true)
     {
@@ -320,8 +320,9 @@ void PlotView::setReal (const char* id, float v)
     if (auto* q = session.param (id)) q->setValueNotifyingHost (q->convertTo0to1 (v));
 }
 
-Rectangle<float> PlotView::laneK() const { return { 30.0f, 16.0f, (float) getWidth() - 44.0f, 60.0f }; }
-Rectangle<float> PlotView::laneB() const { return { 30.0f, 100.0f, (float) getWidth() - 44.0f, 60.0f }; }
+Rectangle<float> PlotView::laneK() const { return { 30.0f, 16.0f, (float) getWidth() - 44.0f, Variant::gem ? 144.0f : 60.0f }; }
+Rectangle<float> PlotView::laneB() const { return Variant::gem ? laneK() : Rectangle<float> { 30.0f, 100.0f, (float) getWidth() - 44.0f, 60.0f }; }
+static bool handleUsed (int i) { return i == 0 ? Variant::hasKick : Variant::hasBass; }
 float PlotView::xAt (float frac) const { return laneK().getX() + frac * laneK().getWidth(); }
 float PlotView::fracAt (float x) const { return (x - laneK().getX()) / laneK().getWidth(); }
 
@@ -339,7 +340,7 @@ int PlotView::handleAt (Point<float> q) const
     const auto hs = handles();
     int best = -1;
     float bd = 13.0f;
-    for (int i = 0; i < (int) hs.size(); ++i) { const float d = hs[(size_t) i].getDistanceFrom (q); if (d < bd) { bd = d; best = i; } }
+    for (int i = 0; i < (int) hs.size(); ++i) { if (! handleUsed (i)) continue; const float d = hs[(size_t) i].getDistanceFrom (q); if (d < bd) { bd = d; best = i; } }
     return best;
 }
 
@@ -412,7 +413,7 @@ void PlotView::paint (Graphics& g)
         offImage = Image (Image::ARGB, jmax (1, getWidth()), jmax (1, getHeight()), true);
         Graphics og (offImage);
         RectangleList<float> rl;
-        for (auto lane : { K, B })
+        for (auto lane : (Variant::gem ? std::vector<Rectangle<float>> { K } : std::vector<Rectangle<float>> { K, B }))
             for (int c = 0; c < cols; ++c)
                 for (int r = 0; r < rows; ++r)
                     rl.addWithoutMerging (Rectangle<float> (lane.getX() + (float) c * 4.0f, lane.getBottom() - 4.0f * (float) (r + 1) + 1.0f, 3.0f, 3.0f));
@@ -422,12 +423,12 @@ void PlotView::paint (Graphics& g)
     g.drawImageAt (offImage, 0, 0);
 
     // lane names in the margin
-    text (g, "K", 8, (int) K.getCentreY() - 7, 2, Col::mid);
-    text (g, "B", 8, (int) B.getCentreY() - 7, 2, Col::mid);
+    if (Variant::hasKick && ! Variant::omega) text (g, "K", 8, (int) K.getCentreY() - 7, 2, Col::mid);
+    if (Variant::hasBass) text (g, "B", 8, (int) B.getCentreY() - 7, 2, Col::mid);
 
     // the overlap of tail and first swell, as a hatch
     const float firstStart = prm.bassStart / (float) steps, overlap = prm.tail - firstStart;
-    if (overlap > 0.0f)
+    if (! Variant::gem && overlap > 0.0f)
     {
         g.setColour (Col::warn.withAlpha (0.35f));
         for (float x = xAt (firstStart); x < xAt (prm.tail); x += 4.0f)
@@ -435,7 +436,7 @@ void PlotView::paint (Graphics& g)
     }
 
     // kick: the amplitude of the tail; bass: the swells. Segments left of the playhead are lit bright.
-    RectangleList<float> played, waiting, pitch;
+    RectangleList<float> played, waiting, pitch, ghost;
     for (int c = 0; c < cols; ++c)
     {
         const float f = ((float) c + 0.5f) / (float) cols;
@@ -444,20 +445,22 @@ void PlotView::paint (Graphics& g)
         float riseU = 0.0f;
         const double q = (double) f * (double) steps;
         const float amp = ruth::swell (prm, q - std::floor (q), stepSec, riseU);
-        const int bn = roundToInt (amp * (float) rows);
+        const int bn = Variant::hasBass ? roundToInt (amp * (float) rows) : 0;
         for (int r = 0; r < jmax (kn, bn); ++r)
         {
             if (r < kn)
-                (lit ? played : waiting).addWithoutMerging (Rectangle<float> (K.getX() + (float) c * 4.0f, K.getBottom() - 4.0f * (float) (r + 1) + 1.0f, 3.0f, 3.0f));
+                (Variant::omega ? ghost : (lit ? played : waiting)).addWithoutMerging (Rectangle<float> (K.getX() + (float) c * 4.0f, K.getBottom() - 4.0f * (float) (r + 1) + 1.0f, 3.0f, 3.0f));
             if (r < bn)
                 (lit ? played : waiting).addWithoutMerging (Rectangle<float> (B.getX() + (float) c * 4.0f, B.getBottom() - 4.0f * (float) (r + 1) + 1.0f, 3.0f, 3.0f));
         }
-        if (amp > 0.0f)   // the pitch of the swell: flat, then climbing at its end
+        if (Variant::hasBass && amp > 0.0f)   // the pitch of the swell: flat, then climbing at its end
         {
             const float py = B.getBottom() - 14.0f - prm.riseSt * riseU / 24.0f * (B.getHeight() - 14.0f);
             pitch.addWithoutMerging (Rectangle<float> (B.getX() + (float) c * 4.0f, py - 1.0f, 3.0f, 3.0f));
         }
     }
+    g.setColour (Col::dim.withAlpha (0.45f));
+    g.fillRectList (ghost);
     g.setColour (Col::mid);
     g.fillRectList (waiting);
     g.setColour (Col::hi);
@@ -486,6 +489,7 @@ void PlotView::paint (Graphics& g)
     const auto hs = handles();
     for (int i = 0; i < (int) hs.size(); ++i)
     {
+        if (! handleUsed (i)) continue;
         const bool on = hover == i || dragging == i;
         const auto r = Rectangle<float> (11.0f, 11.0f).withCentre (hs[(size_t) i]);
         g.setColour (Col::bg);
@@ -502,6 +506,26 @@ void PlotView::paint (Graphics& g)
         g.setColour (Col::bg);
         g.fillRect (tx - 2, ty - 1, tw + 4, 16);
         text (g, handleNames[i], tx, ty, 2, on ? Col::warn : Col::hi);
+    }
+
+    if (Variant::gem)   // the numbers of the one sound this plugin makes
+    {
+        const double tailHz = ruth::noteHz (proc.engine.guiNote.load(), prm.fineCents), stepMs = beatMs / steps;
+        if (Variant::alpha)
+        {
+            text (g, "TAIL " + String (roundToInt (prm.tail * beatMs)) + " MS  DROP " + String (roundToInt (prm.kickSweepMs)) + " MS  +" + String (roundToInt (prm.kickDriveDb)) + " DB", 6, 218, 2, Col::hi);
+            text (g, "START " + String (roundToInt (prm.kickStartHz)) + " HZ  CLICK " + String (roundToInt (prm.click * 100.0f)) + " %", 6, 238, 2, Col::mid);
+            text (g, "TAIL " + String (tailHz, 2) + " HZ  BEAT " + String (roundToInt (beatMs)) + " MS", 6, 258, 2, Col::mid);
+        }
+        else
+        {
+            text (g, "BASS " + String (roundToInt (prm.bassStart * stepMs)) + "-" + String (roundToInt (prm.bassEnd * stepMs)) + " MS  RISE +" + String (prm.riseSt, 1) + " ST", 6, 218, 2, Col::hi);
+            text (g, "GAP " + String (roundToInt ((1.0 - prm.bassEnd) * stepMs)) + " MS  TONE " + String (prm.bassToneHz / 1000.0f, 2) + " KHZ", 6, 238, 2, Col::mid);
+            text (g, "SWELL " + String (prm.curve, 2) + "  NOTE " + String (tailHz, 2) + " HZ", 6, 258, 2, Col::mid);
+        }
+        g.setColour (Col::dim);
+        g.drawRect (getLocalBounds(), 1);
+        return;
     }
 
     // numbers

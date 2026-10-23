@@ -6,17 +6,34 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include "Fission.h"
 #include "PluginProcessor.h"
+#include "Variant.h"
 
 namespace Digi
 {
 namespace Col
 {
+#if DKD_VARIANT == 1          // dkdalpha: blue backlit LCD, dark pixels ("hi" = the strongest contrast)
+    const juce::Colour bg   { 0xff6692c6 };
+    const juce::Colour grid { 0xff5884b8 };
+    const juce::Colour dim  { 0xff27507f };
+    const juce::Colour mid  { 0xff0a2347 };
+    const juce::Colour hi   { 0xff02102a };
+    const juce::Colour warn { 0xff7a1f00 };
+#elif DKD_VARIANT == 2        // dkdomega: red backlit LCD
+    const juce::Colour bg   { 0xffca6858 };
+    const juce::Colour grid { 0xffbb5848 };
+    const juce::Colour dim  { 0xff842318 };
+    const juce::Colour mid  { 0xff3a0806 };
+    const juce::Colour hi   { 0xff180100 };
+    const juce::Colour warn { 0xff0b1f4a };
+#else                         // dkd: green phosphor
     const juce::Colour bg   { 0xff03100a };
     const juce::Colour grid { 0xff0a2415 };   // unlit segments
     const juce::Colour dim  { 0xff1f6e40 };
     const juce::Colour mid  { 0xff4ccf80 };
     const juce::Colour hi   { 0xff8bffb4 };
     const juce::Colour warn { 0xffffb347 };
+#endif
 }
 
 // ---- pixel font (upper case only; every text is drawn at an integer scale, 2 = 10 x 14 px glyphs)
@@ -55,6 +72,7 @@ private:
     enum class Zone { none, prev, name, next, mine, undo };
     Zone zoneAt (juce::Point<float>) const;
     juce::Rectangle<int> zoneRect (Zone) const;
+    int logoW() const { return juce::jmax (60, textWidth (pluginName, 2) + 16); }
     void stepPreset (int delta);
     void showFactoryMenu();
     void showMyPresets();

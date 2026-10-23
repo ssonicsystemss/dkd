@@ -93,8 +93,8 @@ void RutherfordProcessor::processBlock (juce::AudioBuffer<float>& buffer, juce::
         midi.addEvent (wantTest ? juce::MidiMessage::noteOn (1, 53, 0.9f) : juce::MidiMessage::noteOff (1, 53), 0);
         testOn = wantTest;
     }
-    engine.kickMuted = own.replacing() || muteKick.load();
-    engine.bassMuted = muteBass.load();
+    engine.kickMuted = own.replacing() || muteKick.load() || ! Variant::hasKick;   // dkdomega: bass only
+    engine.bassMuted = muteBass.load() || ! Variant::hasBass;                     // dkdalpha: kick only
     engine.process (buffer, midi, host);
     own.render (buffer);
     scope.push (buffer.getReadPointer (0), buffer.getNumSamples());

@@ -239,8 +239,7 @@ void StatusLeds::paint (Graphics& g)
             g.setGradientFill (ColourGradient (rows[i].colour.withAlpha (0.4f * lv), c.x, c.y, rows[i].colour.withAlpha (0.0f), c.x + 10.0f, c.y, true));
             g.fillEllipse (c.x - 10.0f, c.y - 10.0f, 20.0f, 20.0f);
         }
-        g.setColour (rows[i].colour.withAlpha (0.16f + 0.84f * lv));
-        g.fillEllipse (c.x - 5.0f, c.y - 5.0f, 10.0f, 10.0f);
+        lamp (g, c, 10.0f, rows[i].colour.withAlpha (0.16f + 0.84f * lv));
         g.setColour (lv > 0.4f ? Col::bright : Col::print);
         g.setFont (mono (10.0f, true));
         g.drawText (rows[i].label, Rectangle<float> (26.0f, y + 2.0f, 70.0f, 14.0f), Justification::centredLeft, false);
@@ -298,8 +297,7 @@ void MorphSlider::paint (Graphics& g)
         g.setColour (Col::print);
         g.setFont (mono (11.0f, true));
         g.drawText (k == 0 ? "A" : "B", Rectangle<float> (c.x - 12.0f, c.y - 8.0f, 24.0f, 16.0f), Justification::centred, false);
-        g.setColour (lamp ? Col::amber : Col::amber.withAlpha (0.2f));
-        g.fillEllipse (c.x + 8.0f, c.y - 13.0f, 5.0f, 5.0f);
+        Hw::lamp (g, { c.x + 10.5f, c.y - 10.5f }, 5.0f, lamp ? Col::amber : Col::amber.withAlpha (0.2f));
     }
 }
 

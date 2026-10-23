@@ -109,10 +109,10 @@ private:
     }
     std::vector<std::unique_ptr<juce::Component>> hw;   // knobs, faders, switches, lamps...
     DsButton *padTest {}, *padPattern {}, *padKick {}, *padBass {}, *randomKey {}, *undoKey {}, *prevKey {}, *nextKey {};
-    std::array<DsButton*, 4> viewKeys {};
+    std::vector<DsButton*> viewKeys;
     std::array<Hw::Knob*, 4> knobs {};
-    std::array<Hw::Fader*, 2> faders {};
-    std::array<Hw::Switch*, 5> switches {};
+    std::vector<Hw::Fader*> faders;
+    std::vector<Hw::Switch*> switches;
     Hw::DipBank* dip {};
     Hw::StatusLeds* leds {};
     Hw::LevelLadder* ladder {};

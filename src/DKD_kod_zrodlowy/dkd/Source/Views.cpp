@@ -338,8 +338,9 @@ void ModView::paint (Graphics& g)
     }
 
     // ---- the sequencer as it plays (edit it on the SEQ page)
-    drawBox (g, { 4, 192, 372, 84 }, "SEQ");
+    if (Variant::hasBass)
     {
+    drawBox (g, { 4, 192, 372, 84 }, "SEQ");
         const bool on = norm (session, PID::seqOn) > 0.5f;
         const int cur = proc.engine.guiSeqStep.load();
         const bool live = proc.engine.guiPhase.load() >= 0.0f;
@@ -357,15 +358,16 @@ void ModView::paint (Graphics& g)
     }
 
     // ---- the macros
-    drawBox (g, { 382, 192, 174, 84 }, "MACRO");
+    const int mx = Variant::hasBass ? 382 : 4;
+    drawBox (g, { mx, 192, Variant::hasBass ? 174 : 552, 84 }, "MACRO");
     {
         const char* names[3] = { "PUNCH", "WEIGHT", "RAW" };
         const char* mids[3] = { PID::macro1, PID::macro2, PID::macro3 };
         const bool on = norm (session, PID::macroOn) > 0.5f;
         for (int i = 0; i < 3; ++i)
         {
-            text (g, names[i], 390, 214 + i * 18, 2, on ? Col::mid : Col::dim);
-            segBar (g, 464, 216 + i * 18, 10, roundToInt (norm (session, mids[i]) * 10.0f), 7, 10, 1, on ? Col::hi : Col::dim, Col::grid);
+            text (g, names[i], mx + 8, 214 + i * 18, 2, on ? Col::mid : Col::dim);
+            segBar (g, mx + 82, 216 + i * 18, 10, roundToInt (norm (session, mids[i]) * 10.0f), 7, 10, 1, on ? Col::hi : Col::dim, Col::grid);
         }
     }
 }

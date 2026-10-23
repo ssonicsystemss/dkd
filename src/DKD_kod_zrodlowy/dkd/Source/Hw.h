@@ -10,9 +10,26 @@ namespace Hw
 {
 namespace Col
 {
-    const juce::Colour shell { 0xff1a1b1f }, keyFill { 0xff25262b }, keyRim { 0xff464850 }, steelMid { 0xff858892 };
-    const juce::Colour steelDk { 0xff17181c }, steelLo { 0xff34363c }, print { 0xffa7a9b1 }, bright { 0xffecebe7 };
-    const juce::Colour amber { 0xffffa63d }, green { 0xff59d65e }, red { 0xffe5484d }, well { 0xff101114 };
+    const juce::Colour keyFill { 0xff25262b }, keyRim { 0xff464850 }, steelMid { 0xff858892 };
+    const juce::Colour steelDk { 0xff17181c }, steelLo { 0xff34363c }, print { 0xffa7a9b1 }, bright { 0xffecebe7 }, well { 0xff101114 };
+#if DKD_VARIANT == 1
+    const juce::Colour shell { 0xff050507 }, amber { 0xff4a86f5 }, green { 0xff4a86f5 }, red { 0xffff4d6d };
+#elif DKD_VARIANT == 2
+    const juce::Colour shell { 0xff050507 }, amber { 0xffec3c55 }, green { 0xffec3c55 }, red { 0xffffb347 };
+#else
+    const juce::Colour shell { 0xff1a1b1f }, amber { 0xffffa63d }, green { 0xff59d65e }, red { 0xffe5484d };
+#endif
+}
+
+// a lamp: round on dkd, a little diamond on the gem variants
+inline void lamp (juce::Graphics& g, juce::Point<float> c, float size, juce::Colour col)
+{
+    g.setColour (col);
+    if (! Variant::gem) { g.fillEllipse (c.x - size * 0.5f, c.y - size * 0.5f, size, size); return; }
+    juce::Path p;
+    const float h = size * 0.6f;
+    p.addQuadrilateral (c.x, c.y - h, c.x + h, c.y, c.x, c.y + h, c.x - h, c.y);
+    g.fillPath (p);
 }
 
 // a rotary control: ring of lamps lit up to the value, a white tick where the modulated value is now

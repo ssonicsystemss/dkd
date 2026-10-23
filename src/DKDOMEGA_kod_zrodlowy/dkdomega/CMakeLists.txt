@@ -1,0 +1,119 @@
+cmake_minimum_required(VERSION 3.22)
+
+# Static MSVC runtime -> the plugin needs no VC++ Redistributable
+set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+set(CMAKE_OSX_DEPLOYMENT_TARGET "10.13" CACHE STRING "Minimum macOS version")
+
+project(DKDOMEGA VERSION 1.0.1 LANGUAGES C CXX)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+
+option(FIS_BUILD_CLAP  "Build CLAP format (clap-juce-extensions)" ON)
+option(FIS_BUILD_TOOLS "Build offline render / screenshot tool"   ON)
+
+include(FetchContent)
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/JUCE/CMakeLists.txt")
+    add_subdirectory(external/JUCE)
+else()
+    FetchContent_Declare(juce
+        GIT_REPOSITORY https://github.com/juce-framework/JUCE.git
+        GIT_TAG        8.0.4
+        GIT_SHALLOW    TRUE)
+    FetchContent_MakeAvailable(juce)
+endif()
+
+set(FIS_FORMATS VST3 Standalone)
+if(APPLE)
+    list(APPEND FIS_FORMATS AU)
+endif()
+
+# dkdomega: the reverse-bass half of dkd (variant 2 of the shared dkd code in ../../DKD_kod_zrodlowy/dkd).
+# Own plugin identity, so FL lists it next to dkd; parameter IDs are the same as dkd.
+# FISSION by sonicsystems. The product name (= the .vst3 file name), the bundle ID and the codes are the identity FL
+# Studio stores in projects: never change them once released.
+juce_add_plugin(DKDOMEGA
+    COMPANY_NAME              "sonicsystems"
+    PRODUCT_NAME              "dkdomega"
+    PLUGIN_NAME               "dkdomega"
+    BUNDLE_ID                 "com.sonicsystems.dkdomega"
+    PLUGIN_MANUFACTURER_CODE  Sncs
+    PLUGIN_CODE               Sdko
+    IS_SYNTH                  TRUE
+    NEEDS_MIDI_INPUT          TRUE
+    NEEDS_MIDI_OUTPUT         FALSE
+    IS_MIDI_EFFECT            FALSE
+    EDITOR_WANTS_KEYBOARD_FOCUS FALSE
+    COPY_PLUGIN_AFTER_BUILD   FALSE
+    VST3_CATEGORIES           Instrument Synth
+    AU_MAIN_TYPE              kAudioUnitType_MusicDevice
+    FORMATS                   ${FIS_FORMATS})
+
+set(DKD_DIR ${CMAKE_CURRENT_SOURCE_DIR}/../../DKD_kod_zrodlowy/dkd)
+set(FIS_SOURCES
+    ${DKD_DIR}/Source/Params.cpp
+    ${DKD_DIR}/Source/PluginProcessor.cpp
+    ${DKD_DIR}/Source/Digi.cpp
+    ${DKD_DIR}/Source/Views.cpp
+    ${DKD_DIR}/Source/Hw.cpp
+    ${DKD_DIR}/Source/PluginEditor.cpp)
+
+target_sources(DKDOMEGA PRIVATE ${FIS_SOURCES})
+target_include_directories(DKDOMEGA PRIVATE ${DKD_DIR}/Source)
+
+set(FIS_DEFS
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+    JUCE_VST3_CAN_REPLACE_VST2=0
+    JUCE_REPORT_APP_USAGE=0
+    DKD_VARIANT=2)
+
+target_compile_definitions(DKDOMEGA PUBLIC ${FIS_DEFS})
+
+target_link_libraries(DKDOMEGA
+    PRIVATE
+        juce::juce_audio_utils
+        juce::juce_dsp
+    PUBLIC
+        juce::juce_recommended_config_flags
+        juce::juce_recommended_lto_flags
+        juce::juce_recommended_warning_flags)
+
+if(FIS_BUILD_CLAP)
+    if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/external/clap-juce-extensions/CMakeLists.txt")
+        add_subdirectory(external/clap-juce-extensions EXCLUDE_FROM_ALL)
+    else()
+        FetchContent_Declare(clap-juce-extensions
+            GIT_REPOSITORY https://github.com/free-audio/clap-juce-extensions.git
+            GIT_TAG        55525c9858d4b25687be7759a5e0f70eccef218e
+            GIT_SUBMODULES_RECURSE TRUE)
+        FetchContent_MakeAvailable(clap-juce-extensions)
+    endif()
+
+    clap_juce_extensions_plugin(TARGET DKDOMEGA
+        CLAP_ID "com.sonicsystems.dkdomega"
+        CLAP_FEATURES instrument synthesizer drum stereo)
+endif()
+
+# ---- offline render + GUI screenshot (the test)
+if(FIS_BUILD_TOOLS)
+    juce_add_console_app(DKDOMEGARender PRODUCT_NAME "DKDOMEGARender")
+    target_sources(DKDOMEGARender PRIVATE ${DKD_DIR}/Tools/RenderDemo.cpp ${FIS_SOURCES})
+    target_include_directories(DKDOMEGARender PRIVATE ${DKD_DIR}/Source)
+    target_compile_definitions(DKDOMEGARender PRIVATE ${FIS_DEFS} FIS_STANDALONE_TOOL=1)
+    target_link_libraries(DKDOMEGARender
+        PRIVATE
+            juce::juce_audio_utils
+            juce::juce_dsp
+            juce::juce_recommended_config_flags
+            juce::juce_recommended_warning_flags)
+endif()
+
+# ---- FISSION shared look (src/FISSION_shared: controls, window, cloud chamber)
+include(${CMAKE_CURRENT_SOURCE_DIR}/../../FISSION_shared/fission.cmake)
+fission_use(DKDOMEGA)
+if(TARGET DKDOMEGARender)
+    fission_use(DKDOMEGARender)
+endif()

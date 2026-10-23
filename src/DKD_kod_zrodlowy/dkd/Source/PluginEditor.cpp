@@ -7,10 +7,16 @@ using namespace juce;
 // One flat graphite colour for the whole shell, thin steel lines, matte keys. The screens are Digi.
 namespace ds
 {
-    const Colour shell { 0xff1a1b1f }, shellRim { 0xff30323a };
+#if DKD_VARIANT == 1
+    const Colour shell { 0xff050507 }, shellRim { 0xff2b2e36 }, gemDark { 0xff1d46a8 }, gemLight { 0xffa8c8ff };
+#elif DKD_VARIANT == 2
+    const Colour shell { 0xff050507 }, shellRim { 0xff2b2e36 }, gemDark { 0xff8e1325 }, gemLight { 0xffffa3ae };
+#else
+    const Colour shell { 0xff1a1b1f }, shellRim { 0xff30323a }, gemDark { 0xff1a1b1f }, gemLight { 0xff30323a };
+#endif
     const Colour steelHi { 0xffc6c9d0 }, steelMid { 0xff858892 }, steelLo { 0xff34363c }, steelDk { 0xff17181c };
     const Colour keyFill { 0xff25262b }, keyDown { 0xff141518 }, keyRim { 0xff464850 }, print { 0xffa7a9b1 }, bright { 0xffecebe7 };
-    const Colour ledGreen { 0xff59d65e }, ledAmber { 0xffffa63d };
+    const Colour ledGreen = Hw::Col::green, ledAmber = Hw::Col::amber;
 
     // two different corner radii (top / bottom), clockwise from the top edge
     Path roundedPath (Rectangle<float> r, float top, float bottom)
@@ -58,6 +64,26 @@ namespace ds
     void lcd (Graphics& g, Rectangle<float> screen)
     {
         auto bz = screen.expanded (10.0f);
+        if (Variant::gem)
+        {
+            auto cut = [] (Rectangle<float> r, float c)
+            {
+                Path p;
+                p.startNewSubPath (r.getX() + c, r.getY()); p.lineTo (r.getRight() - c, r.getY()); p.lineTo (r.getRight(), r.getY() + c);
+                p.lineTo (r.getRight(), r.getBottom() - c); p.lineTo (r.getRight() - c, r.getBottom()); p.lineTo (r.getX() + c, r.getBottom());
+                p.lineTo (r.getX(), r.getBottom() - c); p.lineTo (r.getX(), r.getY() + c); p.closeSubPath();
+                return p;
+            };
+            g.setColour (gemDark);
+            g.fillPath (cut (bz, 16.0f));
+            g.setColour (gemLight.withAlpha (0.35f));   // the facets: a lighter top-left edge
+            g.strokePath (cut (bz.reduced (3.0f), 14.0f), PathStrokeType (1.0f));
+            g.setColour (Colours::black);
+            g.fillRect (screen.expanded (2.0f));
+            g.setColour (Digi::Col::bg);
+            g.fillRect (screen);
+            return;
+        }
         g.setColour (Colour (0xff070709));
         g.fillRoundedRectangle (bz, 8.0f);
         g.setColour (shellRim);
@@ -102,8 +128,7 @@ void DsButton::paint (Graphics& g)
             g.setColour (over ? ds::steelMid : ds::keyRim);
             g.drawRoundedRectangle (r, 6.0f, 1.0f);
             const bool active = playIcon ? down : on;
-            g.setColour (active ? ds::ledAmber : ds::ledAmber.withAlpha (0.2f));
-            g.fillEllipse (r.getRight() - 12.0f, r.getY() + 7.0f, 5.0f, 5.0f);
+            Hw::lamp (g, { r.getRight() - 9.5f, r.getY() + 9.5f }, 5.0f, active ? ds::ledAmber : ds::ledAmber.withAlpha (0.2f));
             g.setColour (txtCol (false));
             g.setFont (Fiss::mono (10.0f, Fiss::Weight::semibold));
             g.drawText (face, Rectangle<float> (r.getX() + 7.0f, r.getY() + 4.0f, r.getWidth() - 20.0f, 14.0f), Justification::centredLeft, false);
@@ -138,8 +163,7 @@ void DsButton::paint (Graphics& g)
             g.fillRoundedRectangle (r, 5.0f);
             g.setColour (on ? ds::ledAmber.withAlpha (0.7f) : (over ? ds::steelMid : ds::keyRim));
             g.drawRoundedRectangle (r, 5.0f, 1.0f);
-            g.setColour (on ? ds::ledAmber : ds::ledAmber.withAlpha (0.2f));
-            g.fillEllipse (r.getX() + 9.0f, r.getCentreY() - 2.5f, 5.0f, 5.0f);
+            Hw::lamp (g, { r.getX() + 11.5f, r.getCentreY() }, 5.0f, on ? ds::ledAmber : ds::ledAmber.withAlpha (0.2f));
             g.setColour (on ? ds::bright : txtCol (false));
             g.setFont (Fiss::mono (11.0f, Fiss::Weight::semibold));
             g.drawText (face, r.withTrimmedLeft (12.0f), Justification::centred, false);
@@ -288,20 +312,59 @@ DsBody::DsBody (Fiss::Session& s, RutherfordProcessor& p)
 
     // ---- keys
     auto txt = [this] (const char* id) { auto* q = session.param (id); return q != nullptr ? q->getCurrentValueAsText() : String(); };
-    padTest    = add (DsButton::Kind::pad, "TEST", "audition", {});
-    padPattern = add (DsButton::Kind::pad, "PTN", "bass pattern", [this] { cycle (PID::pattern, 1); });
-    padKick    = add (DsButton::Kind::pad, "KICK", "kick", [this]
-                      { proc.muteKick = ! proc.muteKick.load(); session.status ("KICK", proc.muteKick.load() ? "off" : "on"); });
-    padBass    = add (DsButton::Kind::pad, "BASS", "bass", [this]
-                      { proc.muteBass = ! proc.muteBass.load(); session.status ("BASS", proc.muteBass.load() ? "off" : "on"); });
+    Digi::selectedId = Variant::omega ? PID::rise : PID::tail;   // what the data wheel turns first
+    auto isOn = [this] (const char* id) { auto* q = session.param (id); return q != nullptr && q->getValue() > 0.5f; };
+    auto toggle = [this] (const char* id)
+    {
+        if (auto* q = session.param (id))
+        {
+            q->beginChangeGesture(); q->setValueNotifyingHost (q->getValue() > 0.5f ? 0.0f : 1.0f); q->endChangeGesture();
+            session.status (q->getName (32).toUpperCase(), q->getCurrentValueAsText());
+        }
+    };
+    padTest = add (DsButton::Kind::pad, "TEST", "audition", {});
     padTest->playIcon = true;
     padTest->onDown = [this] { proc.testHeld = true; };
     padTest->onUp = [this] { proc.testHeld = false; };
-    padPattern->caption = [txt] { return txt (PID::pattern); };
-    padKick->caption = [this] { return String (proc.muteKick.load() ? "OFF" : "ON"); };
-    padBass->caption = [this] { return String (proc.muteBass.load() ? "OFF" : "ON"); };
-    padKick->lit = [this] { return proc.muteKick.load(); };
-    padBass->lit = [this] { return proc.muteBass.load(); };
+    auto muteKickPad = [this]
+    {
+        auto* p = add (DsButton::Kind::pad, "KICK", "kick", [this] { proc.muteKick = ! proc.muteKick.load(); session.status ("KICK", proc.muteKick.load() ? "off" : "on"); });
+        p->caption = [this] { return String (proc.muteKick.load() ? "OFF" : "ON"); };
+        p->lit = [this] { return proc.muteKick.load(); };
+        return p;
+    };
+    auto muteBassPad = [this]
+    {
+        auto* p = add (DsButton::Kind::pad, "BASS", "bass", [this] { proc.muteBass = ! proc.muteBass.load(); session.status ("BASS", proc.muteBass.load() ? "off" : "on"); });
+        p->caption = [this] { return String (proc.muteBass.load() ? "OFF" : "ON"); };
+        p->lit = [this] { return proc.muteBass.load(); };
+        return p;
+    };
+    if (Variant::alpha)
+    {
+        padPattern = add (DsButton::Kind::pad, "DST", "distortion", [this] { cycle (PID::kickType, 1); });
+        padPattern->caption = [this] { const char* n[3] = { "TANH", "HARD", "FOLD" }; auto* q = session.param (PID::kickType); return String (n[q != nullptr ? jlimit (0, 2, roundToInt (q->getValue() * 2.0f)) : 1]); };
+        padKick = muteKickPad();
+        padBass = add (DsButton::Kind::pad, "CLK", "click", [toggle] { toggle (PID::clickOn); });
+        padBass->caption = [isOn] { return String (isOn (PID::clickOn) ? "ON" : "OFF"); };
+        padBass->lit = [isOn] { return isOn (PID::clickOn); };
+    }
+    else if (Variant::omega)
+    {
+        padPattern = add (DsButton::Kind::pad, "PTN", "bass pattern", [this] { cycle (PID::pattern, 1); });
+        padPattern->caption = [txt] { return txt (PID::pattern); };
+        padKick = muteBassPad();
+        padBass = add (DsButton::Kind::pad, "SEQ", "sequencer", [toggle] { toggle (PID::seqOn); });
+        padBass->caption = [isOn] { return String (isOn (PID::seqOn) ? "ON" : "OFF"); };
+        padBass->lit = [isOn] { return isOn (PID::seqOn); };
+    }
+    else
+    {
+        padPattern = add (DsButton::Kind::pad, "PTN", "bass pattern", [this] { cycle (PID::pattern, 1); });
+        padPattern->caption = [txt] { return txt (PID::pattern); };
+        padKick = muteKickPad();
+        padBass = muteBassPad();
+    }
     randomKey = add (DsButton::Kind::pill, "RANDOM", "new sound", [this] { session.randomize(); });
     undoKey   = add (DsButton::Kind::pill, "UNDO", "last random", [this] { session.undo(); });
     prevKey   = add (DsButton::Kind::pill, "PRESET -", "previous preset", [this] { stepPreset (-1); });
@@ -309,10 +372,10 @@ DsBody::DsBody (Fiss::Session& s, RutherfordProcessor& p)
     {
         const char* names[4] = { "BEAT", "SCOPE", "MOD", "LAB" };
         const char* tips[4] = { "timing of one beat", "wave, spectrum, pitch, meters", "xy pad, lfos, sequencer", "kick against bass" };
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < (Variant::gem ? 3 : 4); ++i)   // LAB compares kick and bass: only in dkd
         {
-            viewKeys[(size_t) i] = add (DsButton::Kind::key, names[i], tips[i], [this, i] { showView (i); });
-            viewKeys[(size_t) i]->lit = [this, i] { return view == i; };
+            viewKeys.push_back (add (DsButton::Kind::key, names[i], tips[i], [this, i] { showView (i); }));
+            viewKeys.back()->lit = [this, i] { return view == i; };
         }
     }
 
@@ -324,13 +387,34 @@ DsBody::DsBody (Fiss::Session& s, RutherfordProcessor& p)
             k->effNorm = [this, id, eff] { auto* q = session.param (id); return q != nullptr ? q->convertTo0to1 (proc.engine.guiEff[(size_t) eff].load()) : -1.0f; };
         return k;
     };
-    knobs = { knob (PID::tail, "TAIL", 0), knob (PID::kickDrive, "DRIVE", 2), knob (PID::bassTone, "TONE", 4), knob (PID::output, "OUT", -1) };
-    faders = { addHw<Hw::Fader> (s, PID::kickLevel, "KICK"), addHw<Hw::Fader> (s, PID::bassLevel, "BASS") };
-    switches = { addHw<Hw::Switch> (s, PID::trigger, "TRG", StringArray { "SYNC", "MIDI" }),
-                 addHw<Hw::Switch> (s, PID::kickType, "DST", StringArray { "TANH", "HARD", "FOLD" }),
-                 addHw<Hw::Switch> (s, PID::clipMode, "CLP", StringArray { "OFF", "SOFT", "HARD" }),
-                 addHw<Hw::Switch> (s, PID::pattern, "PTN", StringArray { "1/4", "1/8", "1/16" }),
-                 addHw<Hw::Switch> (s, Sonic::OwnID::mode, "OWN", StringArray { "LAYER", "REPL" }) };
+    if (Variant::alpha)
+    {
+        knobs = { knob (PID::tail, "TAIL", 0), knob (PID::kickDrive, "DRIVE", 2), knob (PID::click, "CLICK", 3), knob (PID::output, "OUT", -1) };
+        faders = { addHw<Hw::Fader> (s, PID::kickLevel, "KICK") };
+        switches = { addHw<Hw::Switch> (s, PID::trigger, "TRG", StringArray { "SYNC", "MIDI" }),
+                     addHw<Hw::Switch> (s, PID::kickType, "DST", StringArray { "TANH", "HARD", "FOLD" }),
+                     addHw<Hw::Switch> (s, PID::clipMode, "CLP", StringArray { "OFF", "SOFT", "HARD" }),
+                     addHw<Hw::Switch> (s, Sonic::OwnID::mode, "OWN", StringArray { "LAYER", "REPL" }) };
+    }
+    else if (Variant::omega)
+    {
+        knobs = { knob (PID::bassStart, "IN", -1), knob (PID::bassDrive, "DRIVE", 5), knob (PID::bassTone, "TONE", 4), knob (PID::output, "OUT", -1) };
+        faders = { addHw<Hw::Fader> (s, PID::bassLevel, "BASS") };
+        switches = { addHw<Hw::Switch> (s, PID::trigger, "TRG", StringArray { "SYNC", "MIDI" }),
+                     addHw<Hw::Switch> (s, PID::pattern, "PTN", StringArray { "1/4", "1/8", "1/16" }),
+                     addHw<Hw::Switch> (s, PID::clipMode, "CLP", StringArray { "OFF", "SOFT", "HARD" }),
+                     addHw<Hw::Switch> (s, PID::seqOn, "SEQ", StringArray { "OFF", "ON" }) };
+    }
+    else
+    {
+        knobs = { knob (PID::tail, "TAIL", 0), knob (PID::kickDrive, "DRIVE", 2), knob (PID::bassTone, "TONE", 4), knob (PID::output, "OUT", -1) };
+        faders = { addHw<Hw::Fader> (s, PID::kickLevel, "KICK"), addHw<Hw::Fader> (s, PID::bassLevel, "BASS") };
+        switches = { addHw<Hw::Switch> (s, PID::trigger, "TRG", StringArray { "SYNC", "MIDI" }),
+                     addHw<Hw::Switch> (s, PID::kickType, "DST", StringArray { "TANH", "HARD", "FOLD" }),
+                     addHw<Hw::Switch> (s, PID::clipMode, "CLP", StringArray { "OFF", "SOFT", "HARD" }),
+                     addHw<Hw::Switch> (s, PID::pattern, "PTN", StringArray { "1/4", "1/8", "1/16" }),
+                     addHw<Hw::Switch> (s, Sonic::OwnID::mode, "OWN", StringArray { "LAYER", "REPL" }) };
+    }
 
     // ---- the DIP bank: 7 parameters on / off and the freeze of the displays
     auto pdip = [this] (const char* code, const char* name, const char* id)
@@ -348,23 +432,34 @@ DsBody::DsBody (Fiss::Session& s, RutherfordProcessor& p)
     freeze.code = "FZ"; freeze.name = "FREEZE";
     freeze.get = [this] { return analyzer.frozen; };
     freeze.set = [this] (bool v) { analyzer.frozen = v; };
-    dip = addHw<Hw::DipBank> (s, std::vector<Hw::DipBank::Entry> { pdip ("L1", "LFO 1", PID::lfo1On), pdip ("L2", "LFO 2", PID::lfo2On), pdip ("SQ", "SEQUENCER", PID::seqOn),
-                                                                  pdip ("MC", "MACROS", PID::macroOn), pdip ("CK", "CLICK", PID::clickOn), pdip ("RS", "PITCH RISE", PID::riseOn),
-                                                                  pdip ("DC", "DC FILTER", PID::dcOn), freeze });
+    std::vector<Hw::DipBank::Entry> dips { pdip ("L1", "LFO 1", PID::lfo1On), pdip ("L2", "LFO 2", PID::lfo2On) };
+    if (Variant::hasBass) dips.push_back (pdip ("SQ", "SEQUENCER", PID::seqOn));
+    dips.push_back (pdip ("MC", "MACROS", PID::macroOn));
+    if (Variant::hasKick) dips.push_back (pdip ("CK", "CLICK", PID::clickOn));
+    if (Variant::hasBass) dips.push_back (pdip ("RS", "PITCH RISE", PID::riseOn));
+    dips.push_back (pdip ("DC", "DC FILTER", PID::dcOn));
+    dips.push_back (freeze);
+    dip = addHw<Hw::DipBank> (s, dips);
 
     // ---- lamps, ladder, crossfader
     auto lamp = [] (const char* label, std::function<float()> f, Colour c) { return Hw::StatusLeds::Row { label, std::move (f), c }; };
     leds = addHw<Hw::StatusLeds> (std::vector<Hw::StatusLeds::Row> {
         lamp ("SYNC", [this] { return proc.engine.guiPlaying.load() ? 1.0f : 0.0f; }, Hw::Col::green),
         lamp ("BEAT", [this] { const double b = proc.engine.guiBeats.load(); const float f = (float) (b - std::floor (b)); return f < 0.18f ? 1.0f - f / 0.18f : 0.0f; }, Hw::Col::amber),
+        Variant::omega ? lamp ("RISE", [this] { return proc.engine.guiBassNow.load() > (float) ruth::noteHz (proc.engine.guiNote.load(), 0.0f) * 1.03f ? 1.0f : 0.0f; }, Hw::Col::green) :
         lamp ("KICK", [this]
               {
                   const int k = proc.engine.kicksFired.load();
                   if (k != lastKicks) { lastKicks = k; kickAt = Time::getMillisecondCounterHiRes(); }
                   return jlimit (0.0f, 1.0f, 1.0f - (float) ((Time::getMillisecondCounterHiRes() - kickAt) / 150.0));
               }, Hw::Col::green),
-        lamp ("BASS", [this] { return jlimit (0.0f, 1.0f, proc.engine.guiBassAmp.load() * 1.4f); }, Hw::Col::amber),
-        lamp ("SEQ", [this] { auto* q = session.param (PID::seqOn); return q != nullptr && q->getValue() > 0.5f ? 1.0f : 0.0f; }, Hw::Col::green),
+        Variant::alpha ? lamp ("DRIVE", [this] { return jlimit (0.0f, 1.0f, proc.engine.guiCrushK.load() * 1.6f); }, Hw::Col::amber)
+                       : lamp ("BASS", [this] { return jlimit (0.0f, 1.0f, proc.engine.guiBassAmp.load() * 1.4f); }, Hw::Col::amber),
+        lamp (Variant::alpha ? "OWN" : "SEQ", [this]
+              {
+                  auto* q = session.param (Variant::alpha ? Sonic::OwnID::mode : PID::seqOn);
+                  return Variant::alpha ? (proc.own.hasSound() ? 1.0f : 0.0f) : (q != nullptr && q->getValue() > 0.5f ? 1.0f : 0.0f);
+              }, Hw::Col::green),
         lamp ("LFO", [this]
               {
                   const bool a = session.param (PID::lfo1On)->getValue() > 0.5f, b = session.param (PID::lfo2On)->getValue() > 0.5f;
@@ -508,7 +603,7 @@ void DsBody::showPage (int pg)
 
 void DsBody::showView (int v)
 {
-    view = jlimit (0, 3, v);
+    view = jlimit (0, (int) viewKeys.size() - 1, v);
     plot.setVisible (view == 0);
     scope.setVisible (view == 1);
     mod.setVisible (view == 2);
@@ -538,11 +633,51 @@ void DsBody::paint (Graphics& g)
     ds::lcd (g, topLcd());
     ds::lcd (g, bottomLcd());
 
-    // lid: "dkd" on the left, "sonicsystems" on the right, one plain font, one flat colour
+    // lid: the name on the left, "sonicsystems" on the right, one plain font, one flat colour
     const auto lcd = topLcd().expanded (10.0f);
-    g.setColour (Colour (0xffc7cad1));
-    g.setFont (Fiss::mono (26.0f, Fiss::Weight::semibold));
-    g.drawText (Branding::displayName, Rectangle<float> (lcd.getX(), 10.0f, 200.0f, 34.0f), Justification::centredLeft, false);
+    if (Variant::gem)
+    {
+        // the gem mark: three facets, then the letter, the name and what it makes
+        const float gx = lcd.getX(), gy = 14.0f;
+        Path top, left, right;
+        top.addTriangle (gx, gy + 8.0f, gx + 12.0f, gy, gx + 24.0f, gy + 8.0f);
+        left.addTriangle (gx, gy + 8.0f, gx + 12.0f, gy + 8.0f, gx + 12.0f, gy + 26.0f);
+        right.addTriangle (gx + 12.0f, gy + 8.0f, gx + 24.0f, gy + 8.0f, gx + 12.0f, gy + 26.0f);
+        g.setColour (ds::gemLight); g.fillPath (top);
+        g.setColour (ds::ledAmber); g.fillPath (left);
+        g.setColour (ds::gemDark); g.fillPath (right);
+        g.setColour (ds::ledAmber);
+        g.setFont (Fiss::mono (26.0f, Fiss::Weight::semibold));
+        g.drawText (String::fromUTF8 (Variant::alpha ? "\xce\xb1" : "\xce\xa9"), Rectangle<float> (gx + 32.0f, 10.0f, 24.0f, 34.0f), Justification::centredLeft, false);
+        g.setColour (Colour (0xffc7cad1));
+        g.drawText (Branding::displayName, Rectangle<float> (gx + 58.0f, 10.0f, 200.0f, 34.0f), Justification::centredLeft, false);
+        g.setColour (ds::print);
+        g.setFont (Fiss::mono (10.0f, Fiss::Weight::semibold));
+        g.drawText (String (Branding::subtitle).toUpperCase(), Rectangle<float> (gx + 200.0f, 10.0f, 160.0f, 34.0f), Justification::centredLeft, false);
+
+        // one small row of coloured lamps between the hinge and the touch screen
+        static const Colour cols[7] = { Colour (0xffff4d6d), Colour (0xffffb347), Colour (0xffffe14d), Colour (0xff59d65e),
+                                        Colour (0xff38e1ff), Colour (0xff4a86f5), Colour (0xffb07cff) };
+        static const int onA[14] = { 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 1, 0, 1 }, onO[14] = { 1, 1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1 };
+        for (int i = 0; i < 14; ++i)
+        {
+            const bool lit = (Variant::alpha ? onA : onO)[i] != 0;
+            const auto c = cols[(Variant::alpha ? i + 3 : 13 - i) % 7];
+            const Point<float> p (W * 0.5f - 6.5f * 15.0f + (float) i * 15.0f, 505.0f);
+            if (lit)
+            {
+                g.setGradientFill (ColourGradient (c.withAlpha (0.45f), p.x, p.y, c.withAlpha (0.0f), p.x + 8.0f, p.y, true));
+                g.fillEllipse (p.x - 8.0f, p.y - 8.0f, 16.0f, 16.0f);
+            }
+            Hw::lamp (g, p, 7.0f, lit ? c : Colour (0xff22252c));
+        }
+    }
+    else
+    {
+        g.setColour (Colour (0xffc7cad1));
+        g.setFont (Fiss::mono (26.0f, Fiss::Weight::semibold));
+        g.drawText (Branding::displayName, Rectangle<float> (lcd.getX(), 10.0f, 200.0f, 34.0f), Justification::centredLeft, false);
+    }
     g.setColour (ds::print);
     g.setFont (Fiss::mono (15.0f, Fiss::Weight::regular));
     g.drawText (Branding::companyName, Rectangle<float> (lcd.getRight() - 240.0f, 10.0f, 240.0f, 34.0f), Justification::centredRight, false);
@@ -578,12 +713,13 @@ void DsBody::resized()
     for (auto& pn : pages) pn->setBounds (bl);
 
     // lid: view keys under the top screen, lamps and ladder at the sides, lever switches below them
-    for (size_t i = 0; i < viewKeys.size(); ++i) viewKeys[i]->setBounds (200 + (int) i * 116, 414, 92, 26);
+    const int nk = (int) viewKeys.size(), kx = 140 + (560 - (nk * 92 + (nk - 1) * 24)) / 2;
+    for (int i = 0; i < nk; ++i) viewKeys[(size_t) i]->setBounds (kx + i * 116, 414, 92, 26);
     leds->setBounds (18, 70, 104, 200);
     ladder->setBounds (738, 70, 54, 226);
     for (int i = 0; i < 3; ++i) switches[(size_t) i]->setBounds (10 + i * 38, 306, 38, 112);
-    switches[3]->setBounds (730, 306, 38, 112);
-    switches[4]->setBounds (772, 306, 38, 112);
+    if (switches.size() == 4) switches[3]->setBounds (751, 306, 38, 112);
+    else { switches[3]->setBounds (730, 306, 38, 112); switches[4]->setBounds (772, 306, 38, 112); }
 
     // base, left: knobs, data wheel, preset keys, DIP bank
     knobs[0]->setBounds (14, 500, 76, 96);
@@ -603,8 +739,8 @@ void DsBody::resized()
     padBass   ->setBounds (px + off - pad / 2, py + off - pad / 2, pad, pad);
     randomKey->setBounds (668, 756, 74, 24);
     undoKey  ->setBounds (752, 756, 74, 24);
-    faders[0]->setBounds (684, 792, 56, 118);
-    faders[1]->setBounds (754, 792, 56, 118);
+    if (faders.size() == 1) faders[0]->setBounds (719, 792, 56, 118);
+    else { faders[0]->setBounds (684, 792, 56, 118); faders[1]->setBounds (754, 792, 56, 118); }
 
     // under the touch screen: the crossfader between two stored sounds
     morphSlider->setBounds (200, 884, 440, 30);
@@ -655,6 +791,27 @@ DsLiteEditor::DsLiteEditor (RutherfordProcessor& p)
         body.pages.push_back (std::move (pg));
         body.pageNames.add (name);
     };
+#if DKD_VARIANT == 1
+    page ("BEAT", { { choice (PID::trigger, "TRIGGER", { "SYNC", "MIDI" }), 40 }, { slider (PID::tail, "KICK TAIL", 0), 40 }, { slider (PID::fine, "FINE TUNE", 8), 40 } });
+    page ("KICK", { { slider (PID::kickStart, "START PITCH"), 40 }, { slider (PID::kickSweep, "PITCH DROP", 1), 40 }, { slider (PID::kickDrive, "DRIVE", 2), 40 },
+                    { choice (PID::kickType, "DISTORTION", { "TANH", "HARD", "FOLD" }), 40 }, { slider (PID::click, "CLICK", 3), 40 } });
+    page ("OUT", { { slider (PID::kickLevel, "KICK LEVEL"), 40 }, { slider (PID::output, "OUTPUT"), 40 }, { choice (PID::clipMode, "CLIPPER", { "OFF", "SOFT", "HARD" }), 40 } });
+    page ("LFO", { { pick (PID::lfo1Rate, "L1 RATE"), 34 }, { pick (PID::lfo1Shape, "L1 SHAPE"), 34 }, { pick (PID::lfo1Dest, "L1 TARGET"), 34 }, { slider (PID::lfo1Depth, "L1 DEPTH"), 34 },
+                   { pick (PID::lfo2Rate, "L2 RATE"), 34 }, { pick (PID::lfo2Shape, "L2 SHAPE"), 34 }, { pick (PID::lfo2Dest, "L2 TARGET"), 34 }, { slider (PID::lfo2Depth, "L2 DEPTH"), 34 } });
+    page ("MAC", { { slider (PID::macro1, "PUNCH"), 40 }, { slider (PID::macro2, "WEIGHT"), 40 }, { slider (PID::macro3, "RAW"), 40 } });
+    page ("OWN", { { keep (std::make_unique<Digi::OwnBox> (s, proc.own)), 68 }, { slider (Sonic::OwnID::level, "LEVEL"), 40 }, { slider (Sonic::OwnID::tune, "TUNE"), 40 },
+                   { choice (Sonic::OwnID::key, "PITCH", { "FIXED", "NOTES" }), 40 }, { choice (Sonic::OwnID::mode, "MODE", { "LAYER", "REPLACE" }), 40 } });
+#elif DKD_VARIANT == 2
+    page ("BEAT", { { choice (PID::trigger, "TRIGGER", { "SYNC", "MIDI" }), 40 }, { choice (PID::pattern, "BASS PATTERN", { "1/4", "1/8", "1/16" }), 40 },
+                    { slider (PID::bassStart, "BASS IN"), 40 }, { slider (PID::bassEnd, "BASS OUT"), 40 }, { slider (PID::rise, "RISE", 7), 40 } });
+    page ("BASS", { { slider (PID::bassDrive, "DRIVE", 5), 40 }, { slider (PID::curve, "SWELL"), 40 }, { slider (PID::bassTone, "TONE", 4), 40 },
+                    { slider (PID::bassLevel, "BASS LEVEL", 6), 40 } });
+    page ("OUT", { { slider (PID::output, "OUTPUT"), 40 }, { slider (PID::fine, "FINE TUNE", 8), 40 }, { choice (PID::clipMode, "CLIPPER", { "OFF", "SOFT", "HARD" }), 40 } });
+    page ("LFO", { { pick (PID::lfo1Rate, "L1 RATE"), 34 }, { pick (PID::lfo1Shape, "L1 SHAPE"), 34 }, { pick (PID::lfo1Dest, "L1 TARGET"), 34 }, { slider (PID::lfo1Depth, "L1 DEPTH"), 34 },
+                   { pick (PID::lfo2Rate, "L2 RATE"), 34 }, { pick (PID::lfo2Shape, "L2 SHAPE"), 34 }, { pick (PID::lfo2Dest, "L2 TARGET"), 34 }, { slider (PID::lfo2Depth, "L2 DEPTH"), 34 } });
+    page ("SEQ", { { keep (std::make_unique<Digi::SeqGrid> (s, proc)), 290 } });
+    page ("MAC", { { slider (PID::macro1, "PUNCH"), 40 }, { slider (PID::macro2, "WEIGHT"), 40 }, { slider (PID::macro3, "RAW"), 40 } });
+#else
     page ("BEAT", { { choice (PID::trigger, "TRIGGER", { "SYNC", "MIDI" }), 40 }, { choice (PID::pattern, "BASS PATTERN", { "1/4", "1/8", "1/16" }), 40 },
                     { slider (PID::tail, "KICK TAIL", 0), 40 }, { slider (PID::bassStart, "BASS IN"), 40 },
                     { slider (PID::bassEnd, "BASS OUT"), 40 }, { slider (PID::rise, "RISE", 7), 40 } });
@@ -669,6 +826,7 @@ DsLiteEditor::DsLiteEditor (RutherfordProcessor& p)
     page ("MAC", { { slider (PID::macro1, "PUNCH"), 40 }, { slider (PID::macro2, "WEIGHT"), 40 }, { slider (PID::macro3, "RAW"), 40 } });
     page ("OWN", { { keep (std::make_unique<Digi::OwnBox> (s, proc.own)), 68 }, { slider (Sonic::OwnID::level, "LEVEL"), 40 }, { slider (Sonic::OwnID::tune, "TUNE"), 40 },
                    { choice (Sonic::OwnID::key, "PITCH", { "FIXED", "NOTES" }), 40 }, { choice (Sonic::OwnID::mode, "MODE", { "LAYER", "REPLACE" }), 40 } });
+#endif
     body.showPage (0);
 
     for (auto& fp : factoryPresets()) body.top.factoryNames.add (fp.name);

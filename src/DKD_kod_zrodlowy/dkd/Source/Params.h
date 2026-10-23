@@ -1,12 +1,24 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
 
+#include "Variant.h"
+
 namespace Branding
 {
+#if DKD_VARIANT == 1
+    inline constexpr const char* productName = "dkdalpha";
+    inline constexpr const char* displayName = "dkdalpha";
+    inline constexpr const char* subtitle    = "kick";
+#elif DKD_VARIANT == 2
+    inline constexpr const char* productName = "dkdomega";
+    inline constexpr const char* displayName = "dkdomega";
+    inline constexpr const char* subtitle    = "reverse bass";
+#else
     inline constexpr const char* productName = "dkd";
-    inline constexpr const char* companyName = "sonicsystems";
     inline constexpr const char* displayName = "dkd";
     inline constexpr const char* subtitle    = "dualkickdeployment";
+#endif
+    inline constexpr const char* companyName = "sonicsystems";
 }
 
 // Parameter IDs are FROZEN once released: renaming one breaks saved FL projects and automation. Add new ones at the end.
