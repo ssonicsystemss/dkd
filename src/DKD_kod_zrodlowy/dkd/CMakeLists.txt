@@ -55,6 +55,8 @@ set(FIS_SOURCES
     Source/Params.cpp
     Source/PluginProcessor.cpp
     Source/Digi.cpp
+    Source/Views.cpp
+    Source/Hw.cpp
     Source/PluginEditor.cpp)
 
 target_sources(DKD PRIVATE ${FIS_SOURCES})

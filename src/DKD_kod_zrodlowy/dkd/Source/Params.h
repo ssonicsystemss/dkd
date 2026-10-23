@@ -31,6 +31,31 @@ namespace PID
     inline constexpr const char* fine      = "fine";
     inline constexpr const char* output    = "output";
     inline constexpr const char* clipMode  = "clipMode";
+
+    // appended with the modulation / console update: 2 LFOs, 3 macros, a 16 step bass sequencer, the DIP switches.
+    // Everything defaults to "off" or "neutral", so an old project sounds exactly as before.
+    inline constexpr const char* lfo1Rate  = "lfo1Rate";
+    inline constexpr const char* lfo1Shape = "lfo1Shape";
+    inline constexpr const char* lfo1Dest  = "lfo1Dest";
+    inline constexpr const char* lfo1Depth = "lfo1Depth";
+    inline constexpr const char* lfo2Rate  = "lfo2Rate";
+    inline constexpr const char* lfo2Shape = "lfo2Shape";
+    inline constexpr const char* lfo2Dest  = "lfo2Dest";
+    inline constexpr const char* lfo2Depth = "lfo2Depth";
+    inline constexpr const char* macro1    = "macro1";
+    inline constexpr const char* macro2    = "macro2";
+    inline constexpr const char* macro3    = "macro3";
+    inline constexpr const char* lfo1On    = "lfo1On";
+    inline constexpr const char* lfo2On    = "lfo2On";
+    inline constexpr const char* seqOn     = "seqOn";
+    inline constexpr const char* macroOn   = "macroOn";
+    inline constexpr const char* clickOn   = "clickOn";
+    inline constexpr const char* riseOn    = "riseOn";
+    inline constexpr const char* dcOn      = "dcOn";
+    inline constexpr const char* seqLevel[16] = { "seqL01", "seqL02", "seqL03", "seqL04", "seqL05", "seqL06", "seqL07", "seqL08",
+                                                  "seqL09", "seqL10", "seqL11", "seqL12", "seqL13", "seqL14", "seqL15", "seqL16" };
+    inline constexpr const char* seqPitch[16] = { "seqP01", "seqP02", "seqP03", "seqP04", "seqP05", "seqP06", "seqP07", "seqP08",
+                                                  "seqP09", "seqP10", "seqP11", "seqP12", "seqP13", "seqP14", "seqP15", "seqP16" };
 }
 
 juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();

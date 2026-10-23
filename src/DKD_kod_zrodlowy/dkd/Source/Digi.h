@@ -34,6 +34,7 @@ extern bool frozen;   // render test: no blinking
 extern juce::String selectedId;
 extern std::function<void()> onSelect;
 void select (const juce::String& paramId);
+inline bool isSelected (const juce::String& id) { return selectedId == id; }
 
 // ---- top screen
 class Header : public juce::Component
@@ -114,6 +115,7 @@ class SliderRow : public Fiss::Control
 {
 public:
     SliderRow (Fiss::Session& s, const char* id, const char* l) : Fiss::Control (s, id, l) {}
+    std::function<float()> effNorm;   // the value with modulation applied, normalised: drawn as an amber marker on the bar
     ~SliderRow() override { if (gesture) param.endChangeGesture(); }
     juce::Point<float> sizeAt (float) const override { return { 460.0f, 34.0f }; }
     void paint (juce::Graphics&) override;

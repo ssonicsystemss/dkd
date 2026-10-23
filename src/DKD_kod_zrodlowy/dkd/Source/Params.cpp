@@ -87,5 +87,43 @@ juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout()
 
     // ---- appended (2026-10-17): OWN SOUND, the user's own sample (ownLevel, ownTune, ownKey, ownMode)
     Sonic::OwnSound::addParameters (l, false);
+
+    // ---- appended (modulation update): LFOs, macros, sequencer, DIP switches. All off / neutral by default.
+    const juce::StringArray rates { "4 Bar", "2 Bar", "1 Bar", "1/2", "1/4", "1/8", "1/16" };
+    const juce::StringArray shapes { "Sine", "Triangle", "Saw", "Square", "Random" };
+    const juce::StringArray dests { "Off", "Kick Tail", "Kick Drop", "Kick Drive", "Click", "Bass Tone", "Bass Drive", "Bass Level", "Rise", "Fine Tune" };
+    auto depth = [] (const char* pid, const char* name)
+    {
+        return std::make_unique<APF> (id (pid), name, juce::NormalisableRange<float> (-1.0f, 1.0f), 0.0f,
+            juce::AudioParameterFloatAttributes().withLabel ("%")
+                .withStringFromValueFunction ([] (float v, int) { return (v > 0.004f ? "+" : "") + juce::String (juce::roundToInt (v * 100.0f)) + " %"; })
+                .withValueFromStringFunction ([] (const juce::String& t) { return t.getFloatValue() / 100.0f; }));
+    };
+    auto onOff = [&] (const char* pid, const char* name, int def)
+    {
+        l.add (std::make_unique<APC> (id (pid), name, juce::StringArray { "Off", "On" }, def));
+    };
+    l.add (std::make_unique<APC> (id (PID::lfo1Rate), "LFO 1 Rate", rates, 4));
+    l.add (std::make_unique<APC> (id (PID::lfo1Shape), "LFO 1 Shape", shapes, 0));
+    l.add (std::make_unique<APC> (id (PID::lfo1Dest), "LFO 1 Target", dests, 0));
+    l.add (depth (PID::lfo1Depth, "LFO 1 Depth"));
+    l.add (std::make_unique<APC> (id (PID::lfo2Rate), "LFO 2 Rate", rates, 5));
+    l.add (std::make_unique<APC> (id (PID::lfo2Shape), "LFO 2 Shape", shapes, 1));
+    l.add (std::make_unique<APC> (id (PID::lfo2Dest), "LFO 2 Target", dests, 0));
+    l.add (depth (PID::lfo2Depth, "LFO 2 Depth"));
+    l.add (pct (PID::macro1, "Macro Punch", 0.0f, 1.0f, 0.0f));
+    l.add (pct (PID::macro2, "Macro Weight", 0.0f, 1.0f, 0.0f));
+    l.add (pct (PID::macro3, "Macro Raw", 0.0f, 1.0f, 0.0f));
+    onOff (PID::lfo1On, "LFO 1 On", 0);
+    onOff (PID::lfo2On, "LFO 2 On", 0);
+    onOff (PID::seqOn, "Sequencer On", 0);
+    onOff (PID::macroOn, "Macros On", 1);
+    onOff (PID::clickOn, "Click On", 1);
+    onOff (PID::riseOn, "Pitch Rise On", 1);
+    onOff (PID::dcOn, "DC Filter On", 1);
+    for (int i = 0; i < 16; ++i)
+        l.add (pct (PID::seqLevel[i], ("Seq Level " + juce::String (i + 1)).toRawUTF8(), 0.0f, 1.0f, 1.0f));
+    for (int i = 0; i < 16; ++i)
+        l.add (plain (PID::seqPitch[i], ("Seq Pitch " + juce::String (i + 1)).toRawUTF8(), -12.0f, 12.0f, 0.0f, 0, "st"));
     return l;
 }

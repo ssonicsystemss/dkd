@@ -537,6 +537,16 @@ void SliderRow::paint (Graphics& g)
         g.setColour (on ? Col::hi : (zn >= 0.0f && i == zi ? Col::dim : Col::grid));
         g.fillRect (Rectangle<float> ((float) (barL + i * 8), (float) ty, 7.0f, 14.0f));
     }
+    if (effNorm)
+    {
+        const float e = effNorm();
+        if (e >= 0.0f && std::abs (e - value) > 0.004f)
+        {
+            const int mx = barL + (int) (jlimit (0.0f, 1.0f, e) * (float) (n * 8 - 1));
+            g.setColour (Col::warn);
+            g.fillRect (mx - 1, ty - 4, 3, 22);
+        }
+    }
     textRight (g, fit (shortValue (valueText()), 9), getWidth() - 4, ty, 2, Col::hi);
     if (session.isLocked (param.paramID)) { g.setColour (Col::warn); g.fillRect (getWidth() - 7, 2, 5, 5); }
 }

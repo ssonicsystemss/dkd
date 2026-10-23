@@ -19,6 +19,13 @@ struct ScopeBuffer
         writePos.store (w, std::memory_order_release);
     }
 
+    // the last n samples, oldest first (n <= size); for the editor's spectrum
+    void copy (float* dst, int n) const
+    {
+        const int w = writePos.load (std::memory_order_acquire);
+        for (int i = 0; i < n; ++i) dst[i] = data[(size_t) ((w - n + i + 2 * size) % size)].load (std::memory_order_relaxed);
+    }
+
     float peak (int n) const
     {
         const int w = writePos.load (std::memory_order_acquire);
@@ -65,6 +72,7 @@ public:
     Sonic::OwnSound own { { true, 60 } };   // OWN SOUND: the user's own sample
     ParamCache params { apvts };   // atomic<float>* of every parameter, resolved once (ParamCache.h)
     ScopeBuffer scope;
+    Taps taps;   // the kick and the bass on their own, for the screens (Analysis.h)
     // editor keys, not saved: kick / bass mute while tweaking, TEST = a note F while the key is held
     std::atomic<bool> muteKick { false }, muteBass { false }, testHeld { false };
 

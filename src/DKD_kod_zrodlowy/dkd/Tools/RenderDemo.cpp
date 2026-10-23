@@ -251,6 +251,7 @@ int main (int argc, char** argv)
         MidiBuffer m; m.addEvent (MidiMessage::noteOn (1, F3, 0.9f), 0);
         const int blocks = (int) ((2.62 * beat) * sr / block);
         for (int i = 0; i < blocks; ++i) { host.ppq = i * block / sr / beat; proc.processBlock (buf, m); m.clear(); }
+        if (auto* ue = dynamic_cast<DsLiteEditor*> (ed.get())) for (int i = 0; i < 12; ++i) ue->updateAnalyzer();
         auto img = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
         proc.setPlayHead (nullptr);
         File pf = File::getCurrentWorkingDirectory().getChildFile (pngPath);
@@ -268,8 +269,18 @@ int main (int argc, char** argv)
             png.writeImageToStream (simg, sos);
             ed->setSize (img.getWidth(), img.getHeight());
         }
+        if (auto* dv = dynamic_cast<DsLiteEditor*> (ed.get()))   // the other views of the top screen: name-view2.png ...
+            for (int v = 1; v < 4; ++v)
+            {
+                dv->showView (v);
+                auto vimg = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
+                File vp = File::getCurrentWorkingDirectory().getChildFile (pngPath.upToLastOccurrenceOf (".", false, false) + "-view" + String (v + 1) + ".png");
+                vp.deleteFile();
+                FileOutputStream vos (vp);
+                png.writeImageToStream (vimg, vos);
+            }
         if (auto* de = dynamic_cast<DsLiteEditor*> (ed.get()))   // the other touch-screen pages: name-page2.png ...
-            for (int pg = 1; pg < 5; ++pg)
+            for (int pg = 1; pg < 8; ++pg)
             {
                 de->showPage (pg);
                 auto pimg = ed->createComponentSnapshot (ed->getLocalBounds(), true, 1.0f);
@@ -278,6 +289,32 @@ int main (int argc, char** argv)
                 FileOutputStream pos (pp);
                 png.writeImageToStream (pimg, pos);
             }
+    }
+
+    // ---- 9b. modulation: the sequencer, an LFO, a macro, the taps
+    {
+        RutherfordProcessor pp;
+        setParam (pp, PID::seqOn, 1.0f); setParam (pp, PID::seqLevel[3], 0.0f);
+        const auto b = render (pp, 6 * beat, { { 0.0, MidiMessage::noteOn (1, F3, 0.9f) } }, true);
+        const double on2 = energy (b, 2.6 * beat, 2.85 * beat), off3 = energy (b, 3.6 * beat, 3.85 * beat);
+        check (on2 > 1.0e-4 && off3 < on2 * 0.02, "sequencer: step 4 silent, step 3 plays");
+        float kk[2048], bb[2048], mx = 0.0f;
+        pp.taps.copyRaw (kk, bb, 2048);
+        for (int i = 0; i < 2048; ++i) mx = jmax (mx, std::abs (kk[i]), std::abs (bb[i]));
+        check (mx > 0.01f, "taps carry the kick and the bass");
+    }
+    {
+        RutherfordProcessor pp;
+        setParam (pp, PID::lfo1On, 1.0f); setParam (pp, PID::lfo1Dest, 1.0f); setParam (pp, PID::lfo1Depth, 1.0f);
+        setParam (pp, PID::lfo1Shape, 3.0f); setParam (pp, PID::lfo1Rate, 4.0f);
+        render (pp, 1.5 * beat, { { 0.0, MidiMessage::noteOn (1, F3, 0.9f) } }, true);
+        check (std::abs (pp.engine.guiEff[0].load() - 0.30f) > 0.05f && std::abs (pp.engine.guiLfo[0].load()) > 0.5f, "LFO moves the kick tail");
+    }
+    {
+        RutherfordProcessor pp;
+        setParam (pp, PID::macro2, 1.0f);
+        render (pp, 1.5 * beat, { { 0.0, MidiMessage::noteOn (1, F3, 0.9f) } }, true);
+        check (pp.engine.guiEff[0].load() > 0.45f && pp.engine.guiEff[6].load() > 0.7f, "macro WEIGHT: longer tail, more bass");
     }
 
     // ---- 10. level independent of the sample rate

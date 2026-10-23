@@ -8,6 +8,7 @@ RutherfordProcessor::RutherfordProcessor()
     own.attach (apvts);
     own.replaceClearsAll = false;   // REPLACE swaps only the kick: the reverse bass keeps playing
     engine.own = &own;
+    engine.taps = &taps;
     apvts.state.setProperty ("preset", "U-150 Classic", nullptr);   // the parameter defaults = that factory preset
 }
 
@@ -52,6 +53,23 @@ RuthParams RutherfordProcessor::readParams() const
     p.fineCents   = f (PID::fine);
     p.outputDb    = f (PID::output);
     p.clipMode    = (int) f (PID::clipMode);
+    const char* lfoIds[2][4] = { { PID::lfo1Rate, PID::lfo1Shape, PID::lfo1Dest, PID::lfo1Depth }, { PID::lfo2Rate, PID::lfo2Shape, PID::lfo2Dest, PID::lfo2Depth } };
+    for (int i = 0; i < 2; ++i)
+    {
+        p.lfo[i].rate = (int) f (lfoIds[i][0]);
+        p.lfo[i].shape = (int) f (lfoIds[i][1]);
+        p.lfo[i].dest = (int) f (lfoIds[i][2]);
+        p.lfo[i].depth = f (lfoIds[i][3]);
+    }
+    p.lfo[0].on = f (PID::lfo1On) > 0.5f;
+    p.lfo[1].on = f (PID::lfo2On) > 0.5f;
+    p.macro[0] = f (PID::macro1); p.macro[1] = f (PID::macro2); p.macro[2] = f (PID::macro3);
+    p.macroOn = f (PID::macroOn) > 0.5f;
+    p.seqOn = f (PID::seqOn) > 0.5f;
+    p.clickOn = f (PID::clickOn) > 0.5f;
+    p.riseOn = f (PID::riseOn) > 0.5f;
+    p.dcOn = f (PID::dcOn) > 0.5f;
+    for (int i = 0; i < 16; ++i) { p.seqLevel[i] = f (PID::seqLevel[i]); p.seqPitch[i] = f (PID::seqPitch[i]); }
     return p;
 }
 
